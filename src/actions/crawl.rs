@@ -1,9 +1,10 @@
 use std::fmt;
-use std::fs::File;
-use std::io::Write;
+use std::fs::{File, OpenOptions};
+use std::io::{BufReader, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 
 use another_rust_warc::header::{FieldNames, Header, RecordID, RecordTypes};
+use another_rust_warc::reader::{Reader, find_record_by_type};
 use another_rust_warc::record::Record;
 use another_rust_warc::writer::write_record;
 use anyhow::{Result, anyhow};
@@ -13,6 +14,7 @@ use chrono::format::SecondsFormat;
 use reqwest::blocking::Client;
 use reqwest::header::{CONTENT_TYPE, USER_AGENT};
 use rusqlite::Connection;
+use scraper::Html;
 
 use crate::db;
 
@@ -47,11 +49,21 @@ pub fn crawl_one(
             client.execute(request.try_clone().ok_or(anyhow!("could not clone body"))?)?;
 
         let encoded_url = encode_url(url);
-        let warc_path = path.join("warcs").join(encoded_url);
-        let mut warc_file = File::create(warc_path)?;
 
+        /* We stream the result body into the warc file later we will read the file again to create
+         * a wat file the benefit will be that we can read through the stream twice without ever
+         * having the whole file in memory
+         */
+        let warc_path = path.join("warcs").join(format!("{}.warc", encoded_url));
+        let mut warc_file = OpenOptions::new().append(true).read(true).open(warc_path)?;
         write_request_record(&mut warc_file, &request)?;
         write_response_record(&mut warc_file, &mut response)?;
+        warc_file.seek(SeekFrom::Start(0))?;
+
+        let wat_path = path.join("warcs").join(format!("{}.wat", encoded_url));
+        let mut wat_file = OpenOptions::new().append(true).read(true).open(wat_path)?;
+
+        write_wat_record(&warc_file, &mut wat_file)?;
         Ok(())
     };
 
@@ -144,4 +156,23 @@ pub fn request_to_string(request: &reqwest::blocking::Request) -> Result<String>
     }
 
     Ok(output)
+}
+
+pub fn write_wat_record(warc_file: &File, writer: &mut dyn Write) -> Result<()> {
+    let mut reader = Reader::new(BufReader::new(warc_file));
+
+    let response_record = find_record_by_type(&mut reader, RecordTypes::Response)?
+        .ok_or(anyhow!("no response record found"))?;
+
+    let body = std::str::from_utf8(&response_record.content)?;
+    let document = Html::parse_document(body);
+
+    for text in document.root_element().text() {
+        for word in text.split_whitespace() {
+            write!(writer, "{}", word)?;
+        }
+        write!(writer, "\n")?;
+    }
+
+    Ok(())
 }

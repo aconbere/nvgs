@@ -36,7 +36,7 @@ pub fn run() -> Result<()> {
     let cli = Cli::parse();
 
     if let Action::Init = &cli.action {
-        actions::init::init(&cli.db_path)?
+        actions::init::init(&cli.path)?
     }
 
     let db_path = cli.path.join("nvgs.db");
