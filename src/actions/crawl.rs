@@ -1,6 +1,7 @@
+use std::collections::HashMap;
 use std::fmt;
 use std::fs::{File, OpenOptions};
-use std::io::{BufReader, Seek, SeekFrom, Write};
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 
 use another_rust_warc::header::{FieldNames, Header, RecordID, RecordTypes};
@@ -16,7 +17,7 @@ use reqwest::header::{CONTENT_TYPE, USER_AGENT};
 use rusqlite::Connection;
 use scraper::Html;
 
-use crate::db;
+use crate::db::{index, term_frequencies};
 
 static USER_AGENT_STR: &str = "nvgs/1.0";
 
@@ -26,7 +27,7 @@ fn encode_url(url: &str) -> String {
 
 pub fn crawl(connection: &Connection, path: &PathBuf) -> Result<()> {
     let client = Client::new();
-    let entries = db::index::get_all_needing_update(connection)?;
+    let entries = index::get_all_needing_update(connection)?;
 
     for e in entries {
         crawl_one(connection, path, &client, &e.url)?;
@@ -40,7 +41,7 @@ pub fn crawl_one(
     client: &Client,
     url: &str,
 ) -> Result<()> {
-    db::index::set_crawling(connection, url)?;
+    index::set_crawling(connection, url)?;
 
     let result: Result<()> = {
         let request = client.get(url).header(USER_AGENT, USER_AGENT_STR).build()?;
@@ -60,19 +61,27 @@ pub fn crawl_one(
         write_response_record(&mut warc_file, &mut response)?;
         warc_file.seek(SeekFrom::Start(0))?;
 
-        let wat_path = path.join("warcs").join(format!("{}.wat", encoded_url));
-        let mut wat_file = OpenOptions::new().append(true).read(true).open(wat_path)?;
+        /* We stream the wet file similarly, we will then take the text and process the counts
+         * and frequencies
+         */
+        let wet_path = path.join("warcs").join(format!("{}.wet", encoded_url));
+        let mut wet_file = OpenOptions::new().append(true).read(true).open(wet_path)?;
+        write_wat_record(&warc_file, &mut wet_file)?;
+        wet_file.seek(SeekFrom::Start(0))?;
 
-        write_wat_record(&warc_file, &mut wat_file)?;
+        let terms = analyze_terms(&mut wet_file, url)?;
+        for t in terms {
+            term_frequencies::insert(connection, &t)?;
+        }
         Ok(())
     };
 
     match result {
         Ok(_) => {
             let now = Utc::now().timestamp();
-            db::index::set_ready(connection, url, now)?;
+            index::set_ready(connection, url, now)?;
         }
-        Err(_) => db::index::set_ready(connection, url, 0)?,
+        Err(_) => index::set_ready(connection, url, 0)?,
     }
 
     Ok(())
@@ -175,4 +184,39 @@ pub fn write_wat_record(warc_file: &File, writer: &mut dyn Write) -> Result<()> 
     }
 
     Ok(())
+}
+
+pub fn analyze_terms(
+    reader: &mut dyn Read,
+    url: &str,
+) -> Result<Vec<term_frequencies::TermFrequency>> {
+    let lines = BufReader::new(reader).lines();
+
+    let mut terms: HashMap<String, term_frequencies::TermFrequency> = HashMap::new();
+    let mut total = 0;
+
+    for line in lines {
+        let l = line?;
+        for word in l.split_whitespace() {
+            let w = word.to_string();
+            total += 1;
+            if let Some(tf) = terms.get_mut(&w) {
+                tf.count += 1;
+            } else {
+                terms.insert(w.clone(), term_frequencies::TermFrequency {
+                    term: w,
+                    count: 1,
+                    frequency: 0.0,
+                    url: url.to_string(),
+                });
+            }
+        }
+    }
+
+    for (_, v) in terms.iter_mut() {
+        v.frequency = v.count as f64 / total as f64;
+    }
+
+    let result: Vec<term_frequencies::TermFrequency> = terms.into_values().collect();
+    Ok(result)
 }

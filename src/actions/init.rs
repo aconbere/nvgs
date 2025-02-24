@@ -19,6 +19,7 @@ pub fn init(path: &PathBuf) -> Result<()> {
 
     let connection = Connection::open(path.join("nvgs.db"))?;
     db::index::create_table(&connection)?;
+    db::term_frequencies::create_table(&connection)?;
 
     Ok(())
 }

@@ -3,12 +3,12 @@ use std::io::{BufRead, BufReader, Read};
 
 use anyhow::Result;
 
-struct TermCounts {
+pub struct TermCounts {
     pub counts: HashMap<String, u64>,
     pub total: u64,
 }
 
-pub fn term_counts(body: &mut dyn Read) -> Result<TermCounts> {
+pub fn counts(body: &mut dyn Read) -> Result<TermCounts> {
     let lines = BufReader::new(body).lines();
 
     let mut counts = HashMap::new();
@@ -30,7 +30,7 @@ pub fn term_counts(body: &mut dyn Read) -> Result<TermCounts> {
     Ok(TermCounts { counts, total })
 }
 
-pub fn term_frequencies(term_counts: &TermCounts) -> HashMap<String, f64> {
+pub fn frequencies(term_counts: &TermCounts) -> HashMap<String, f64> {
     let mut frequencies = HashMap::new();
     for (k, v) in term_counts.counts.iter() {
         let v = *v as f64;

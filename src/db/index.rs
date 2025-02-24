@@ -86,8 +86,8 @@ pub fn insert(connection: &Connection, entry: &Entry) -> Result<()> {
         VALUES (?1, ?2, ?3)
         ON CONFLICT (url)
         DO UPDATE
-            set status = ?1,
-            set last_upddated = ?1,
+            set status = ?2,
+            set last_upddated = ?3,
         ",
         params![entry.url, entry.status, entry.last_updated],
     )?;
