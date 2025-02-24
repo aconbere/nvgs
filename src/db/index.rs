@@ -49,7 +49,7 @@ impl ToSql for Status {
 pub struct Entry {
     pub url: String,
     pub status: Status,
-    pub last_updated: u64,
+    pub last_updated: i64,
 }
 
 impl Entry {
@@ -58,7 +58,7 @@ impl Entry {
         Ok(Self {
             url: url.into(),
             status: Status::Ready,
-            last_updated: 0,
+            last_updated: -1,
         })
     }
 }
@@ -128,4 +128,31 @@ pub fn get_all_with_status_since(
 
 pub fn get_all_needing_update(connection: &Connection) -> Result<Vec<Entry>> {
     get_all_with_status_since(connection, &Status::Ready, &TimeDelta::minutes(3))
+}
+
+pub fn set_crawling(connection: &Connection, url: &str) -> Result<()> {
+    connection.execute(
+        "UPDATE index
+        SET
+            status = ?2
+        WHERE
+            url = ?1
+        ",
+        params![url, Status::Crawling],
+    )?;
+    Ok(())
+}
+
+pub fn set_ready(connection: &Connection, url: &str, updated_at: i64) -> Result<()> {
+    connection.execute(
+        "UPDATE index
+        SET
+            status = ?2,
+            last_updated ?3
+        WHERE
+            url = ?1
+        ",
+        params![url, Status::Ready, updated_at],
+    )?;
+    Ok(())
 }

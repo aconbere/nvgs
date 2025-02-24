@@ -1,3 +1,4 @@
+use std::fmt;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -7,6 +8,8 @@ use another_rust_warc::record::Record;
 use another_rust_warc::writer::write_record;
 use anyhow::{Result, anyhow};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE};
+use chrono::Utc;
+use chrono::format::SecondsFormat;
 use reqwest::blocking::Client;
 use reqwest::header::{CONTENT_TYPE, USER_AGENT};
 use rusqlite::Connection;
@@ -29,18 +32,36 @@ pub fn crawl(connection: &Connection, path: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-pub fn crawl_one(connect: &Connection, path: &PathBuf, client: &Client, url: &str) -> Result<()> {
-    let request = client.get(url).header(USER_AGENT, USER_AGENT_STR).build()?;
+pub fn crawl_one(
+    connection: &Connection,
+    path: &PathBuf,
+    client: &Client,
+    url: &str,
+) -> Result<()> {
+    db::index::set_crawling(connection, url)?;
 
-    let mut response =
-        client.execute(request.try_clone().ok_or(anyhow!("could not clone body"))?)?;
+    let result: Result<()> = {
+        let request = client.get(url).header(USER_AGENT, USER_AGENT_STR).build()?;
 
-    let encoded_url = encode_url(url);
-    let warc_path = path.join("warcs").join(encoded_url);
-    let mut warc_file = File::create(warc_path)?;
+        let mut response =
+            client.execute(request.try_clone().ok_or(anyhow!("could not clone body"))?)?;
 
-    write_request_record(&mut warc_file, &request)?;
-    write_response_record(&mut warc_file, &mut response)?;
+        let encoded_url = encode_url(url);
+        let warc_path = path.join("warcs").join(encoded_url);
+        let mut warc_file = File::create(warc_path)?;
+
+        write_request_record(&mut warc_file, &request)?;
+        write_response_record(&mut warc_file, &mut response)?;
+        Ok(())
+    };
+
+    match result {
+        Ok(_) => {
+            let now = Utc::now().timestamp();
+            db::index::set_ready(connection, url, now)?;
+        }
+        Err(_) => db::index::set_ready(connection, url, 0)?,
+    }
 
     Ok(())
 }
@@ -103,4 +124,24 @@ fn write_response_record(
     write_record(writer, &record, response)?;
 
     Ok(())
+}
+
+pub fn request_to_string(request: &reqwest::blocking::Request) -> Result<String> {
+    let mut output = String::new();
+
+    let method = request.method();
+    let url = request.url();
+    let path = url.path();
+    let version = request.version();
+
+    fmt::write(
+        &mut output,
+        format_args!("{} {} {:?}\n", method.as_str(), path, version),
+    )?;
+
+    for (k, v) in request.headers().into_iter() {
+        fmt::write(&mut output, format_args!("{}: {}", k.as_str(), v.to_str()?))?;
+    }
+
+    Ok(output)
 }
