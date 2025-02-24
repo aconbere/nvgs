@@ -1,7 +1,8 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
+use rusqlite::Connection;
 
 use crate::actions;
 
@@ -13,7 +14,7 @@ use crate::actions;
 pub struct Cli {
     #[command(subcommand)]
     action: Action,
-    db_path: String,
+    path: PathBuf,
 }
 
 #[derive(Subcommand, Debug)]
@@ -28,24 +29,28 @@ pub enum Action {
         #[arg(long)]
         query: String,
     },
-    Init {
-        #[arg(long)]
-        path: PathBuf,
-    },
+    Init,
 }
 
 pub fn run() -> Result<()> {
     let cli = Cli::parse();
 
-    if cli.Action == Action::Init {}
+    if let Action::Init = &cli.action {
+        actions::init::init(&cli.db_path)?
+    }
+
+    let db_path = cli.path.join("nvgs.db");
+    let connection = Connection::open(db_path)?;
 
     match &cli.action {
-        Add { url } => {}
-        Crawl => {}
-        Index => {}
-        Search => {}
-        Init => Err(anyhow!(
+        Action::Add { url } => actions::add::add(&connection, url),
+        Action::Crawl => actions::crawl::crawl(&connection, &cli.path),
+        Action::Index => Ok(()),
+        Action::Search { query } => Ok(()),
+        Action::Init => Err(anyhow!(
             "Should never get here, earlier check for init failed"
         )),
-    }
+    }?;
+
+    Ok(())
 }

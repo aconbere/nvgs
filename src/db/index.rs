@@ -47,9 +47,9 @@ impl ToSql for Status {
 }
 
 pub struct Entry {
-    url: String,
-    status: Status,
-    last_updated: u64,
+    pub url: String,
+    pub status: Status,
+    pub last_updated: u64,
 }
 
 impl Entry {
