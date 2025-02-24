@@ -17,7 +17,7 @@ use reqwest::header::{CONTENT_TYPE, USER_AGENT};
 use rusqlite::Connection;
 use scraper::Html;
 
-use crate::db::{index, term_frequencies};
+use crate::db::{crawls, term_frequencies};
 
 static USER_AGENT_STR: &str = "nvgs/1.0";
 
@@ -27,7 +27,9 @@ fn encode_url(url: &str) -> String {
 
 pub fn crawl(connection: &Connection, path: &PathBuf) -> Result<()> {
     let client = Client::new();
-    let entries = index::get_all_needing_update(connection)?;
+    let entries = crawls::get_all_needing_update(connection)?;
+
+    println!("Crawling {} pages", entries.len());
 
     for e in entries {
         crawl_one(connection, path, &client, &e.url)?;
@@ -41,11 +43,12 @@ pub fn crawl_one(
     client: &Client,
     url: &str,
 ) -> Result<()> {
-    index::set_crawling(connection, url)?;
+    crawls::set_crawling(connection, url)?;
 
     let result: Result<()> = {
         let request = client.get(url).header(USER_AGENT, USER_AGENT_STR).build()?;
 
+        println!("Fetching {}", url);
         let mut response =
             client.execute(request.try_clone().ok_or(anyhow!("could not clone body"))?)?;
 
@@ -55,8 +58,13 @@ pub fn crawl_one(
          * a wat file the benefit will be that we can read through the stream twice without ever
          * having the whole file in memory
          */
+        println!("Writing warc...");
         let warc_path = path.join("warcs").join(format!("{}.warc", encoded_url));
-        let mut warc_file = OpenOptions::new().append(true).read(true).open(warc_path)?;
+        let mut warc_file = OpenOptions::new()
+            .append(true)
+            .read(true)
+            .create(true)
+            .open(warc_path)?;
         write_request_record(&mut warc_file, &request)?;
         write_response_record(&mut warc_file, &mut response)?;
         warc_file.seek(SeekFrom::Start(0))?;
@@ -64,11 +72,17 @@ pub fn crawl_one(
         /* We stream the wet file similarly, we will then take the text and process the counts
          * and frequencies
          */
+        println!("Writing wet...");
         let wet_path = path.join("warcs").join(format!("{}.wet", encoded_url));
-        let mut wet_file = OpenOptions::new().append(true).read(true).open(wet_path)?;
+        let mut wet_file = OpenOptions::new()
+            .append(true)
+            .read(true)
+            .create(true)
+            .open(wet_path)?;
         write_wat_record(&warc_file, &mut wet_file)?;
         wet_file.seek(SeekFrom::Start(0))?;
 
+        println!("Analyzing terms...");
         let terms = analyze_terms(&mut wet_file, url)?;
         for t in terms {
             term_frequencies::insert(connection, &t)?;
@@ -79,9 +93,9 @@ pub fn crawl_one(
     match result {
         Ok(_) => {
             let now = Utc::now().timestamp();
-            index::set_ready(connection, url, now)?;
+            crawls::set_ready(connection, url, now)?;
         }
-        Err(_) => index::set_ready(connection, url, 0)?,
+        Err(_) => crawls::set_ready(connection, url, 0)?,
     }
 
     Ok(())
@@ -170,18 +184,38 @@ pub fn request_to_string(request: &reqwest::blocking::Request) -> Result<String>
 pub fn write_wat_record(warc_file: &File, writer: &mut dyn Write) -> Result<()> {
     let mut reader = Reader::new(BufReader::new(warc_file));
 
-    let response_record = find_record_by_type(&mut reader, RecordTypes::Response)?
+    let record = find_record_by_type(&mut reader, RecordTypes::Response)?
         .ok_or(anyhow!("no response record found"))?;
 
-    let body = std::str::from_utf8(&response_record.content)?;
-    let document = Html::parse_document(body);
+    let content_type = record
+        .header
+        .get(&FieldNames::ContentType)
+        .ok_or(anyhow!("No content_type"))?;
 
-    for text in document.root_element().text() {
-        for word in text.split_whitespace() {
-            write!(writer, "{}", word)?;
+    match content_type.as_str() {
+        "text/plain" => {
+            let body = String::from_utf8_lossy_owned(record.content);
+            writer.write_all(body.as_bytes())?;
         }
-        write!(writer, "\n")?;
-    }
+        "text/html" => {
+            let body = String::from_utf8_lossy_owned(record.content);
+            let document = Html::parse_document(&body);
+
+            for text in document.root_element().text() {
+                for word in text.split_whitespace() {
+                    let t = word.trim();
+                    if t.is_empty() {
+                        continue;
+                    }
+                    write!(writer, "{} ", word)?;
+                }
+                write!(writer, "\n")?;
+            }
+        }
+        _ => {
+            return Err(anyhow!("Cannot process files of type: {}", content_type));
+        }
+    };
 
     Ok(())
 }

@@ -1,2 +1,2 @@
-pub mod index;
+pub mod crawls;
 pub mod term_frequencies;

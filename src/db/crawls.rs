@@ -46,13 +46,13 @@ impl ToSql for Status {
     }
 }
 
-pub struct Entry {
+pub struct Crawl {
     pub url: String,
     pub status: Status,
     pub last_updated: i64,
 }
 
-impl Entry {
+impl Crawl {
     pub fn new(url_str: &str) -> Result<Self> {
         let url = Url::parse(url_str)?;
         Ok(Self {
@@ -65,31 +65,33 @@ impl Entry {
 
 pub fn create_table(connection: &Connection) -> Result<()> {
     connection.execute(
-        "
-        CREATE TABLE index (
-            url: String NOT NULL,
-            status: String NOT NULL,
-            last_updated: INTEGER NOT NULL,
+        "CREATE TABLE crawls (
+            url String NOT NULL,
+            status String NOT NULL,
+            last_updated INTEGER NOT NULL,
             PRIMARY KEY (url)
-        )
-        ",
+        )",
         params![],
     )?;
     Ok(())
 }
 
-pub fn insert(connection: &Connection, entry: &Entry) -> Result<()> {
+pub fn insert(connection: &Connection, crawl: &Crawl) -> Result<()> {
     connection.execute(
-        "INSERT INTO index (
-            url, status, last_updated
-        )
-        VALUES (?1, ?2, ?3)
-        ON CONFLICT (url)
+        "INSERT INTO
+            crawls (
+                url, status, last_updated
+            )
+        VALUES
+            (?1, ?2, ?3)
+        ON CONFLICT
+            (url)
         DO UPDATE
-            set status = ?2,
-            set last_upddated = ?3,
+        SET
+            status = ?2,
+            last_updated = ?3
         ",
-        params![entry.url, entry.status, entry.last_updated],
+        params![crawl.url, crawl.status, crawl.last_updated],
     )?;
     Ok(())
 }
@@ -98,22 +100,23 @@ pub fn get_all_with_status_since(
     connection: &Connection,
     status: &Status,
     since: &TimeDelta,
-) -> Result<Vec<Entry>> {
+) -> Result<Vec<Crawl>> {
     let mut statement = connection.prepare(
         "SELECT
             url, status, last_updated
-        FROM index
+        FROM
+            crawls
         WHERE
             status = ?1 AND
-            last_updated > ?2
+            last_updated < ?2
         ",
     )?;
 
     let last_updated = (Utc::now() - *since).timestamp();
 
-    let result: Vec<Entry> = statement
+    let result: Vec<Crawl> = statement
         .query_map(params![status, last_updated], |row| {
-            Ok(Entry {
+            Ok(Crawl {
                 url: row.get(0)?,
                 status: row.get(1)?,
                 last_updated: row.get(2)?,
@@ -126,13 +129,14 @@ pub fn get_all_with_status_since(
     Ok(result)
 }
 
-pub fn get_all_needing_update(connection: &Connection) -> Result<Vec<Entry>> {
+pub fn get_all_needing_update(connection: &Connection) -> Result<Vec<Crawl>> {
     get_all_with_status_since(connection, &Status::Ready, &TimeDelta::minutes(3))
 }
 
 pub fn set_crawling(connection: &Connection, url: &str) -> Result<()> {
     connection.execute(
-        "UPDATE index
+        "UPDATE
+            crawls
         SET
             status = ?2
         WHERE
@@ -145,10 +149,11 @@ pub fn set_crawling(connection: &Connection, url: &str) -> Result<()> {
 
 pub fn set_ready(connection: &Connection, url: &str, updated_at: i64) -> Result<()> {
     connection.execute(
-        "UPDATE index
+        "UPDATE
+            crawls
         SET
             status = ?2,
-            last_updated ?3
+            last_updated = ?3
         WHERE
             url = ?1
         ",

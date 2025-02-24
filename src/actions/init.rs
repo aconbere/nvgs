@@ -18,7 +18,7 @@ pub fn init(path: &PathBuf) -> Result<()> {
     fs::create_dir(path.join("warcs"))?;
 
     let connection = Connection::open(path.join("nvgs.db"))?;
-    db::index::create_table(&connection)?;
+    db::crawls::create_table(&connection)?;
     db::term_frequencies::create_table(&connection)?;
 
     Ok(())

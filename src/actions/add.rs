@@ -4,7 +4,7 @@ use rusqlite::Connection;
 use crate::db;
 
 pub fn add(connection: &Connection, uri_str: &str) -> Result<()> {
-    let e = db::index::Entry::new(uri_str)?;
-    db::index::insert(connection, &e)?;
+    let e = db::crawls::Crawl::new(uri_str)?;
+    db::crawls::insert(connection, &e)?;
     Ok(())
 }

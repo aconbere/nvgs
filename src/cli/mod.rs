@@ -14,6 +14,8 @@ use crate::actions;
 pub struct Cli {
     #[command(subcommand)]
     action: Action,
+
+    #[arg(long)]
     path: PathBuf,
 }
 
@@ -36,7 +38,8 @@ pub fn run() -> Result<()> {
     let cli = Cli::parse();
 
     if let Action::Init = &cli.action {
-        actions::init::init(&cli.path)?
+        actions::init::init(&cli.path)?;
+        return Ok(());
     }
 
     let db_path = cli.path.join("nvgs.db");
