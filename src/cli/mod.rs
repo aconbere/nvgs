@@ -28,8 +28,8 @@ pub enum Action {
     Crawl,
     Index,
     Search {
-        #[arg(long)]
-        query: String,
+        #[arg(long, value_parser, num_args = 1.., value_delimiter = ' ')]
+        query: Vec<String>,
     },
     Init,
 }
@@ -48,8 +48,8 @@ pub fn run() -> Result<()> {
     match &cli.action {
         Action::Add { url } => actions::add::add(&connection, url),
         Action::Crawl => actions::crawl::crawl(&connection, &cli.path),
-        Action::Index => Ok(()),
-        Action::Search { query } => Ok(()),
+        Action::Index => actions::index::index(&connection),
+        Action::Search { query } => actions::search::search(&connection, query),
         Action::Init => Err(anyhow!(
             "Should never get here, earlier check for init failed"
         )),

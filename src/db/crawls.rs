@@ -66,8 +66,8 @@ impl Crawl {
 pub fn create_table(connection: &Connection) -> Result<()> {
     connection.execute(
         "CREATE TABLE crawls (
-            url String NOT NULL,
-            status String NOT NULL,
+            url STRING NOT NULL,
+            status STRING NOT NULL,
             last_updated INTEGER NOT NULL,
             PRIMARY KEY (url)
         )",

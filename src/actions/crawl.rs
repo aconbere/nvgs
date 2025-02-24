@@ -61,7 +61,8 @@ pub fn crawl_one(
         println!("Writing warc...");
         let warc_path = path.join("warcs").join(format!("{}.warc", encoded_url));
         let mut warc_file = OpenOptions::new()
-            .append(true)
+            .write(true)
+            .append(false)
             .read(true)
             .create(true)
             .open(warc_path)?;
@@ -75,7 +76,8 @@ pub fn crawl_one(
         println!("Writing wet...");
         let wet_path = path.join("warcs").join(format!("{}.wet", encoded_url));
         let mut wet_file = OpenOptions::new()
-            .append(true)
+            .write(true)
+            .append(false)
             .read(true)
             .create(true)
             .open(wet_path)?;
@@ -202,6 +204,10 @@ pub fn write_wat_record(warc_file: &File, writer: &mut dyn Write) -> Result<()> 
             let document = Html::parse_document(&body);
 
             for text in document.root_element().text() {
+                let trimmed = text.trim();
+                if trimmed.is_empty() {
+                    continue;
+                }
                 for word in text.split_whitespace() {
                     let t = word.trim();
                     if t.is_empty() {
@@ -232,7 +238,7 @@ pub fn analyze_terms(
     for line in lines {
         let l = line?;
         for word in l.split_whitespace() {
-            let w = word.to_string();
+            let w = word.to_lowercase();
             total += 1;
             if let Some(tf) = terms.get_mut(&w) {
                 tf.count += 1;
