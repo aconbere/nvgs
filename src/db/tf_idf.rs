@@ -3,6 +3,7 @@ use rusqlite::{Connection, params};
 
 pub struct TfIdfScore {
     pub url: String,
+    #[allow(dead_code)]
     pub term: String,
     pub score: f64,
 }
