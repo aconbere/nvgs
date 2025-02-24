@@ -4,6 +4,7 @@ use anyhow::Result;
 
 mod actions;
 mod cli;
+mod db;
 mod terms;
 
 fn main() -> Result<()> {

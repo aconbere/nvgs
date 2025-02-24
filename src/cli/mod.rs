@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -13,38 +13,39 @@ use crate::actions;
 pub struct Cli {
     #[command(subcommand)]
     action: Action,
+    db_path: String,
 }
 
 #[derive(Subcommand, Debug)]
 pub enum Action {
-    Fetch {
+    Add {
         #[arg(long)]
         url: String,
-
-        #[arg(long)]
-        output: PathBuf,
     },
-    ReadWARC {
+    Crawl,
+    Index,
+    Search {
         #[arg(long)]
-        input: PathBuf,
+        query: String,
     },
-    ExtractText {
+    Init {
         #[arg(long)]
-        input: PathBuf,
-
-        #[arg(long)]
-        output: PathBuf,
+        path: PathBuf,
     },
 }
 
 pub fn run() -> Result<()> {
     let cli = Cli::parse();
 
+    if cli.Action == Action::Init {}
+
     match &cli.action {
-        Action::Fetch { url, output } => actions::fetch::fetch(url, &output),
-        Action::ReadWARC { input } => actions::read_warc::read_warc(&input),
-        Action::ExtractText { input, output } => {
-            actions::extract_text::extract_text(&input, &output)
-        }
+        Add { url } => {}
+        Crawl => {}
+        Index => {}
+        Search => {}
+        Init => Err(anyhow!(
+            "Should never get here, earlier check for init failed"
+        )),
     }
 }
