@@ -5,7 +5,7 @@ use rusqlite::Connection;
 
 use crate::db::tf_idf;
 
-pub fn search(connection: &Connection, terms: &Vec<String>) -> Result<()> {
+pub fn execute(connection: &Connection, terms: &Vec<String>) -> Result<Vec<(String, f64)>> {
     // a map of (url, term) pairs to a score
     // each subsequent term adds a smaller amount
     // to the total score.
@@ -28,7 +28,12 @@ pub fn search(connection: &Connection, terms: &Vec<String>) -> Result<()> {
     let mut sorted_results: Vec<(String, f64)> = scored_results.into_iter().collect();
     sorted_results.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap());
 
-    for (url, score) in sorted_results {
+    Ok(sorted_results)
+}
+
+pub fn search(connection: &Connection, terms: &Vec<String>) -> Result<()> {
+    let results = execute(connection, terms)?;
+    for (url, score) in results {
         println!("\t{}\t{}", url, score);
     }
 

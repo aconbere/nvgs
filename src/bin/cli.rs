@@ -4,8 +4,7 @@ use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
 use rusqlite::Connection;
 
-use crate::actions;
-use crate::api;
+use nvgs::actions;
 
 #[derive(Parser, Debug)]
 #[command(name = "nvgs")]
@@ -33,13 +32,9 @@ pub enum Action {
         query: Vec<String>,
     },
     Init,
-    Serve {
-        #[arg(long)]
-        address: String,
-    },
 }
 
-pub async fn run() -> Result<()> {
+pub fn main() -> Result<()> {
     let cli = Cli::parse();
 
     if let Action::Init = &cli.action {
@@ -55,10 +50,6 @@ pub async fn run() -> Result<()> {
         Action::Crawl => actions::crawl::crawl(&connection, &cli.path),
         Action::Index => actions::index::index(&connection),
         Action::Search { query } => actions::search::search(&connection, query),
-        Action::Serve { address } => {
-            api::start(&cli.path, address).await?;
-            Ok(())
-        }
         Action::Init => Err(anyhow!(
             "Should never get here, earlier check for init failed"
         )),
