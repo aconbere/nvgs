@@ -56,9 +56,15 @@ pub fn index(connection: &Connection) -> Result<()> {
                 tdc.term = tf.term
         )
         INSERT INTO
-            tf_idf
-        (url, term, score)
-        SELECT * FROM scores
+            tf_idf (
+                url, term, score
+            )
+        SELECT * FROM scores WHERE true
+        ON CONFLICT
+            (url, term)
+        DO UPDATE
+        SET
+            score = excluded.score
         ",
         params![],
     )?;

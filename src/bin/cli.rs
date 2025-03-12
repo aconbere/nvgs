@@ -43,11 +43,11 @@ pub fn main() -> Result<()> {
     }
 
     let db_path = cli.path.join("nvgs.db");
-    let connection = Connection::open(db_path)?;
+    let mut connection = Connection::open(db_path)?;
 
     match &cli.action {
         Action::Add { url } => actions::add::add(&connection, url),
-        Action::Crawl => actions::crawl::crawl(&connection, &cli.path),
+        Action::Crawl => actions::crawl::crawl(&mut connection, &cli.path),
         Action::Index => actions::index::index(&connection),
         Action::Search { query } => actions::search::search(&connection, query),
         Action::Init => Err(anyhow!(

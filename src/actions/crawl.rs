@@ -25,7 +25,7 @@ fn encode_url(url: &str) -> String {
     URL_SAFE.encode(url)
 }
 
-pub fn crawl(connection: &Connection, path: &PathBuf) -> Result<()> {
+pub fn crawl(connection: &mut Connection, path: &PathBuf) -> Result<()> {
     let client = Client::new();
     let entries = crawls::get_all_needing_update(connection)?;
 
@@ -38,14 +38,14 @@ pub fn crawl(connection: &Connection, path: &PathBuf) -> Result<()> {
 }
 
 pub fn crawl_one(
-    connection: &Connection,
+    connection: &mut Connection,
     path: &PathBuf,
     client: &Client,
     url: &str,
 ) -> Result<()> {
     crawls::set_crawling(connection, url)?;
 
-    let result: Result<()> = {
+    let result: Result<()> = try {
         let request = client.get(url).header(USER_AGENT, USER_AGENT_STR).build()?;
 
         println!("Fetching {}", url);
@@ -86,10 +86,16 @@ pub fn crawl_one(
 
         println!("Analyzing terms...");
         let terms = analyze_terms(&mut wet_file, url)?;
+
+        let tx = connection.transaction()?;
+        println!("Updating term frequencies...");
         for t in terms {
-            term_frequencies::insert(connection, &t)?;
+            term_frequencies::insert(&tx, &t)?;
         }
-        Ok(())
+        tx.commit();
+
+        let now = Utc::now().timestamp();
+        crawls::set_ready(connection, url, now)?;
     };
 
     match result {
@@ -126,6 +132,39 @@ fn write_request_record(
     Ok(())
 }
 
+struct ContentType {
+    mime_type: String,
+    charset: String,
+    boundary: String,
+}
+
+impl ContentType {
+    pub fn from_response(response: &reqwest::blocking::Response) -> ContentType {
+        let content_type = match response.headers().get(CONTENT_TYPE) {
+            Some(hv) => hv.to_str().unwrap_or("application/octect-stream"),
+            None => "application/octet-stream",
+        }
+        .to_string();
+        Self::from_string(&content_type)
+    }
+
+    pub fn from_string(input: &str) -> ContentType {
+        let mime_type = match input.split_once(";") {
+            Some((mime, _rest)) => mime.to_string(),
+            None => input.to_string(),
+        };
+
+        let charset = "".to_string();
+        let boundary = "".to_string();
+
+        ContentType {
+            mime_type,
+            charset,
+            boundary,
+        }
+    }
+}
+
 fn write_response_record(
     writer: &mut dyn Write,
     response: &mut reqwest::blocking::Response,
@@ -141,20 +180,14 @@ fn write_response_record(
         .ok_or(anyhow!("no valid remote address header in response"))?
         .to_string();
 
-    let content_type = match response.headers().get(CONTENT_TYPE) {
-        Some(hv) => hv.to_str().unwrap_or("application/octect-stream"),
-        None => "application/octet-stream",
-    }
-    .to_string();
-
-    //.unwrap_or("application/octet-stream".to_string());
+    let content_type = ContentType::from_response(response);
 
     let mut header = Header::new();
     header.insert(FieldNames::RecordID, RecordID::new().to_string());
     header.insert(FieldNames::Type, RecordTypes::Response.to_string());
     header.insert(FieldNames::Date, date);
     header.insert(FieldNames::IPAddress, remote_addr);
-    header.insert(FieldNames::ContentType, content_type);
+    header.insert(FieldNames::ContentType, content_type.mime_type);
     header.insert(FieldNames::ContentLength, content_length.to_string());
     let record = Record::new(header, content_length);
 
@@ -259,4 +292,16 @@ pub fn analyze_terms(
 
     let result: Vec<term_frequencies::TermFrequency> = terms.into_values().collect();
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn content_type() {
+        let test = "text/html; charset=UTF-8".to_string();
+        let result = ContentType::from_string(&test);
+        assert_eq!(result.mime_type, "text/html");
+    }
 }
