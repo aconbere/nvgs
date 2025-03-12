@@ -92,7 +92,7 @@ pub fn crawl_one(
         for t in terms {
             term_frequencies::insert(&tx, &t)?;
         }
-        tx.commit();
+        tx.commit()?;
 
         let now = Utc::now().timestamp();
         crawls::set_ready(connection, url, now)?;

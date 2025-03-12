@@ -7,7 +7,7 @@ use axum::{
     http::StatusCode,
     response,
     response::{IntoResponse, Response},
-    routing::post,
+    routing,
 };
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
@@ -16,13 +16,16 @@ use tokio_rusqlite::Connection;
 use crate::actions::search;
 use crate::db::crawls;
 
+static SEARCH_PAGE: &str = include_str!("../../data/search_page.html");
+
 pub async fn start(path: &PathBuf, address: &str) -> Result<()> {
     let db_path = path.join("nvgs.db");
     let connection = Connection::open(db_path).await?;
 
     let app = Router::new()
-        .route("/add", post(add))
-        .route("/search", post(search))
+        .route("/add", routing::post(add))
+        .route("/search", routing::post(search))
+        .route("/search", routing::get(search_page))
         .with_state(connection);
 
     let listener = TcpListener::bind(address).await.unwrap();
@@ -64,6 +67,10 @@ async fn search(
         StatusCode::CREATED,
         response::Json(SearchResult { results }),
     ))
+}
+
+async fn search_page() -> response::Html<&'static str> {
+    response::Html(SEARCH_PAGE)
 }
 
 // the input to our `create_user` handler
