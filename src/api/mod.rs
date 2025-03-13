@@ -14,11 +14,13 @@ use tokio::net::TcpListener;
 use tokio_rusqlite::Connection;
 
 use crate::actions::search;
+use crate::actions::search::Document;
 use crate::db::crawls;
 
 static SEARCH_PAGE: &str = include_str!("../../data/search_page.html");
 
 pub async fn start(path: &PathBuf, address: &str) -> Result<()> {
+    println!("Starting nvgs server: {}", address);
     let db_path = path.join("nvgs.db");
     let connection = Connection::open(db_path).await?;
 
@@ -44,6 +46,7 @@ async fn add(
                     crawls::Crawl::new(&u).map_err(|e| tokio_rusqlite::Error::Other(e.into()))?;
                 crawls::insert(&conn, &crawl)
                     .map_err(|e| tokio_rusqlite::Error::Other(e.into()))?;
+                println!("Added url: {}", u);
             }
             Ok(())
         })
@@ -73,22 +76,19 @@ async fn search_page() -> response::Html<&'static str> {
     response::Html(SEARCH_PAGE)
 }
 
-// the input to our `create_user` handler
 #[derive(Deserialize)]
 struct AddUrls {
     urls: Vec<String>,
 }
 
-// the input to our `create_user` handler
 #[derive(Deserialize)]
 struct SearchQuery {
     terms: Vec<String>,
 }
 
-// the input to our `create_user` handler
 #[derive(Serialize)]
 struct SearchResult {
-    results: Vec<(String, f64)>,
+    results: Vec<Document>,
 }
 
 // Make our own error that wraps `anyhow::Error`.

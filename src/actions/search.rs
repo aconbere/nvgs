@@ -2,10 +2,23 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use rusqlite::Connection;
+use serde::Serialize;
 
 use crate::db::tf_idf;
 
-pub fn execute(connection: &Connection, terms: &Vec<String>) -> Result<Vec<(String, f64)>> {
+#[derive(Serialize)]
+pub struct Document {
+    pub url: String,
+    pub score: f64,
+}
+
+impl Document {
+    pub fn new(url: String, score: f64) -> Self {
+        Self { url, score }
+    }
+}
+
+pub fn execute(connection: &Connection, terms: &Vec<String>) -> Result<Vec<Document>> {
     // a map of (url, term) pairs to a score
     // each subsequent term adds a smaller amount
     // to the total score.
@@ -25,16 +38,20 @@ pub fn execute(connection: &Connection, terms: &Vec<String>) -> Result<Vec<(Stri
         }
     }
 
-    let mut sorted_results: Vec<(String, f64)> = scored_results.into_iter().collect();
-    sorted_results.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap());
+    let mut sorted_results: Vec<Document> = scored_results
+        .into_iter()
+        .map(|(url, score)| Document::new(url, score))
+        .collect();
+
+    sorted_results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
 
     Ok(sorted_results)
 }
 
 pub fn search(connection: &Connection, terms: &Vec<String>) -> Result<()> {
     let results = execute(connection, terms)?;
-    for (url, score) in results {
-        println!("\t{}\t{}", url, score);
+    for document in results {
+        println!("\t{}\t{}", document.url, document.score);
     }
 
     Ok(())

@@ -34,7 +34,7 @@ pub fn index(connection: &Connection) -> Result<()> {
         ),
         term_document_count AS (
             SELECT
-                url, term, COUNT(DISTINCT url) AS c
+                term, COUNT(DISTINCT url) AS c
             FROM
                 term_frequencies
             GROUP BY
@@ -44,7 +44,7 @@ pub fn index(connection: &Connection) -> Result<()> {
             SELECT
                 tf.url,
                 tf.term,
-                -LOG10(
+                tf.frequency * -LOG10(
                     CAST(tdc.c AS FLOAT) / (SELECT CAST(c AS FLOAT) FROM document_count)
                 )
             FROM
@@ -52,7 +52,6 @@ pub fn index(connection: &Connection) -> Result<()> {
             JOIN
                 term_document_count AS tdc
             ON
-                tdc.url = tf.url AND
                 tdc.term = tf.term
         )
         INSERT INTO

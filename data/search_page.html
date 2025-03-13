@@ -1,9 +1,59 @@
 <html>
+    <head>
+        <title>Not Very Good Search</title>
+    </head>
     <body>
         <h1>Not Very Good Search</h1>
-        <form>
-            <input type="text"></input>
+        <form id="search-form">
+            <input id="search-input"type="text"></input>
+            <input id="search-button" type="submit" value="Search" />
         </form>
-        <button>Search</button>
+
+        <ol id="results">
+        </ol>
     </body>
+    <script type="text/javascript">
+        console.log("start");
+        let createResultElement = (result) => {
+            let li = document.createElement("li");
+            let link = document.createElement("a");
+            let scoreText = document.createTextNode(`: ${result.score}`)
+            let linkText = document.createTextNode(result.url)
+            link.href = result.url;
+            link.appendChild(linkText);
+            li.appendChild(link);
+            li.appendChild(scoreText);
+            return li
+        }
+            
+        let form = document.getElementById("search-form");
+        let searchInput = document.getElementById("search-input");
+        let resultsList = document.getElementById("results");
+
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            console.log("click");
+            resultsList.innerHTML = "";
+            if(searchInput == ""){
+                return;
+            }
+            let terms = searchInput.value.split(" ")
+            let response = await fetch("/search", {
+                method: "POST",
+                body: JSON.stringify({ terms: terms }),
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            });
+            console.log("searched");
+
+            let results = await response.json();
+
+            results.results.forEach((result) => {
+                resultsList.appendChild(createResultElement(result));
+            });
+        };
+    </script>
 </html>
