@@ -1,9 +1,8 @@
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use axum::{
     Json, Router,
-    extract::Query,
     extract::State,
     http::StatusCode,
     response,
@@ -54,7 +53,8 @@ async fn get_crawl(
             Ok(crawls::get(&conn, &payload.url)
                 .map_err(|e| tokio_rusqlite::Error::Other(e.into()))?)
         })
-        .await?;
+        .await?
+        .ok_or(anyhow!("no crawl found"))?;
     Ok((StatusCode::CREATED, response::Json(crawl)))
 }
 

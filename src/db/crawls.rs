@@ -2,7 +2,7 @@ use anyhow::Result;
 use chrono::{TimeDelta, Utc};
 use reqwest::Url;
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -99,7 +99,7 @@ pub fn insert(connection: &Connection, crawl: &Crawl) -> Result<()> {
     Ok(())
 }
 
-pub fn get(connection: &Connection, url: &str) -> Result<Crawl> {
+pub fn get(connection: &Connection, url: &str) -> Result<Option<Crawl>> {
     let mut statement = connection.prepare(
         "SELECT
             url, status, last_updated
@@ -112,13 +112,15 @@ pub fn get(connection: &Connection, url: &str) -> Result<Crawl> {
         ",
     )?;
 
-    let result: Crawl = statement.query_row(params![url], |row| {
-        Ok(Crawl {
-            url: row.get(0)?,
-            status: row.get(1)?,
-            last_updated: row.get(2)?,
+    let result: Option<Crawl> = statement
+        .query_row(params![url], |row| {
+            Ok(Crawl {
+                url: row.get(0)?,
+                status: row.get(1)?,
+                last_updated: row.get(2)?,
+            })
         })
-    })?;
+        .optional()?;
     Ok(result)
 }
 
