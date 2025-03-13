@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use axum::{
     Json, Router,
+    extract::Query,
     extract::State,
     http::StatusCode,
     response,
@@ -24,8 +25,12 @@ pub async fn start(path: &PathBuf, address: &str) -> Result<()> {
     let db_path = path.join("nvgs.db");
     let connection = Connection::open(db_path).await?;
 
+    // Note using post for crawls/get because sending
+    // urls through query params is a pain in my ass
     let app = Router::new()
-        .route("/add", routing::post(add))
+        .route("/crawls", routing::post(add_crawl))
+        .route("/crawls/get", routing::post(get_crawl))
+        .route("/crawls", routing::delete(delete_crawl))
         .route("/search", routing::post(search))
         .route("/search", routing::get(search_page))
         .with_state(connection);
@@ -35,9 +40,32 @@ pub async fn start(path: &PathBuf, address: &str) -> Result<()> {
     Ok(())
 }
 
-async fn add(
+#[derive(Deserialize)]
+struct GetCrawlRequest {
+    url: String,
+}
+
+async fn get_crawl(
     State(connection): State<Connection>,
-    Json(payload): Json<AddUrls>,
+    Json(payload): Json<GetCrawlRequest>,
+) -> Result<(StatusCode, response::Json<crawls::Crawl>), AppError> {
+    let crawl = connection
+        .call(move |conn| {
+            Ok(crawls::get(&conn, &payload.url)
+                .map_err(|e| tokio_rusqlite::Error::Other(e.into()))?)
+        })
+        .await?;
+    Ok((StatusCode::CREATED, response::Json(crawl)))
+}
+
+#[derive(Deserialize)]
+struct AddCrawlRequest {
+    urls: Vec<String>,
+}
+
+async fn add_crawl(
+    State(connection): State<Connection>,
+    Json(payload): Json<AddCrawlRequest>,
 ) -> Result<(StatusCode, String), AppError> {
     connection
         .call(|conn| {
@@ -49,6 +77,24 @@ async fn add(
                 println!("Added url: {}", u);
             }
             Ok(())
+        })
+        .await?;
+    Ok((StatusCode::CREATED, "".to_string()))
+}
+
+#[derive(Deserialize)]
+struct DeleteCrawlRequest {
+    url: String,
+}
+
+async fn delete_crawl(
+    State(connection): State<Connection>,
+    Json(payload): Json<DeleteCrawlRequest>,
+) -> Result<(StatusCode, String), AppError> {
+    connection
+        .call(move |conn| {
+            Ok(crawls::delete(&conn, &payload.url)
+                .map_err(|e| tokio_rusqlite::Error::Other(e.into()))?)
         })
         .await?;
     Ok((StatusCode::CREATED, "".to_string()))
@@ -74,11 +120,6 @@ async fn search(
 
 async fn search_page() -> response::Html<&'static str> {
     response::Html(SEARCH_PAGE)
-}
-
-#[derive(Deserialize)]
-struct AddUrls {
-    urls: Vec<String>,
 }
 
 #[derive(Deserialize)]

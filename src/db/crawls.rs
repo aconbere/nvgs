@@ -3,7 +3,9 @@ use chrono::{TimeDelta, Utc};
 use reqwest::Url;
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
 use rusqlite::{Connection, params};
+use serde::Serialize;
 
+#[derive(Serialize)]
 pub enum Status {
     Ready,
     Crawling,
@@ -46,6 +48,7 @@ impl ToSql for Status {
     }
 }
 
+#[derive(Serialize)]
 pub struct Crawl {
     pub url: String,
     pub status: Status,
@@ -93,6 +96,45 @@ pub fn insert(connection: &Connection, crawl: &Crawl) -> Result<()> {
         ",
         params![crawl.url, crawl.status, crawl.last_updated],
     )?;
+    Ok(())
+}
+
+pub fn get(connection: &Connection, url: &str) -> Result<Crawl> {
+    let mut statement = connection.prepare(
+        "SELECT
+            url, status, last_updated
+        FROM
+            crawls
+        WHERE
+            url = ?1
+        LIMIT
+            1
+        ",
+    )?;
+
+    let result: Crawl = statement.query_row(params![url], |row| {
+        Ok(Crawl {
+            url: row.get(0)?,
+            status: row.get(1)?,
+            last_updated: row.get(2)?,
+        })
+    })?;
+    Ok(result)
+}
+
+pub fn delete(connection: &Connection, url: &str) -> Result<()> {
+    let mut statement = connection.prepare(
+        "DELETE
+        FROM
+            crawls
+        WHERE
+            url = ?1
+        LIMIT
+            1
+        ",
+    )?;
+
+    statement.execute(params![url])?;
     Ok(())
 }
 
