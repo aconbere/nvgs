@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use axum::{
     Json, Router,
     extract::State,
@@ -29,10 +29,11 @@ pub async fn start(path: &PathBuf, address: &str) -> Result<()> {
     let app = Router::new()
         .route("/crawls", routing::post(add_crawl))
         .route("/crawls/get", routing::post(get_crawl))
-        .route("/crawls", routing::delete(delete_crawl))
+        .route("/crawls/delete", routing::post(delete_crawl))
         .route("/search", routing::post(search))
         .route("/search", routing::get(search_page))
-        .with_state(connection);
+        .with_state(connection)
+        .fallback(handler_404);
 
     let listener = TcpListener::bind(address).await.unwrap();
     axum::serve(listener, app).await.unwrap();
@@ -47,15 +48,26 @@ struct GetCrawlRequest {
 async fn get_crawl(
     State(connection): State<Connection>,
     Json(payload): Json<GetCrawlRequest>,
-) -> Result<(StatusCode, response::Json<crawls::Crawl>), AppError> {
-    let crawl = connection
+) -> Response {
+    let crawl_result = connection
         .call(move |conn| {
             Ok(crawls::get(&conn, &payload.url)
                 .map_err(|e| tokio_rusqlite::Error::Other(e.into()))?)
         })
-        .await?
-        .ok_or(anyhow!("no crawl found"))?;
-    Ok((StatusCode::CREATED, response::Json(crawl)))
+        .await;
+
+    let maybe_crawl = match crawl_result {
+        Err(e) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+        }
+        Ok(mc) => mc,
+    };
+
+    if let Some(crawl) = maybe_crawl {
+        (StatusCode::CREATED, response::Json(crawl)).into_response()
+    } else {
+        StatusCode::NOT_FOUND.into_response()
+    }
 }
 
 #[derive(Deserialize)]
@@ -155,4 +167,8 @@ where
     fn from(err: E) -> Self {
         Self(err.into())
     }
+}
+
+async fn handler_404() -> impl IntoResponse {
+    (StatusCode::NOT_FOUND, "nothing to see here")
 }
