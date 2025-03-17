@@ -103,7 +103,11 @@ pub fn crawl_one(
             let now = Utc::now().timestamp();
             crawls::set_ready(connection, url, now)?;
         }
-        Err(_) => crawls::set_ready(connection, url, 0)?,
+        Err(e) => {
+            crawls::set_ready(connection, url, 0)?;
+            println!("Failed to fetch: {}", url);
+            println!("\tError:{}", e);
+        }
     }
 
     Ok(())
@@ -171,6 +175,9 @@ fn write_response_record(
 ) -> Result<()> {
     let date = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
 
+    // Note sometimes there is no content length header and I'll need to read the whole body in and
+    // write a record. Maybe need to bifurcate the code here since trying to do this generically is
+    // hard.
     let content_length = response
         .content_length()
         .ok_or(anyhow!("no valid content length header on response"))?;
