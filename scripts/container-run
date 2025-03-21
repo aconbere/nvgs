@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# --interactive  starts an interactive session connected to stdin
+# --tty starts a pseudo tty
+# --rm  clean up after exit
+# --publish 3000:80 publish these ports
+sudo docker run \
+    --interactive \
+    --tty \
+    --rm \
+    --publish 3000:80 \
+    --mount type=bind,src=/var/nvgs/index,dst=/index \
+    nvgs
+
+
+

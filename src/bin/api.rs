@@ -22,6 +22,10 @@ pub struct Cli {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    api::start(&cli.path, &cli.address).await?;
+    match api::start(&cli.path, &cli.address).await {
+        Ok(_) => println!("done"),
+        Err(e) => println!("error: {}", e),
+    };
+
     Ok(())
 }

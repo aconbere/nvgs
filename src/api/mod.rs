@@ -22,7 +22,9 @@ static SEARCH_PAGE: &str = include_str!("../../data/search_page.html");
 pub async fn start(path: &PathBuf, address: &str) -> Result<()> {
     println!("Starting nvgs server: {}", address);
     let db_path = path.join("nvgs.db");
+    println!("Connecting: {}", db_path.display());
     let connection = Connection::open(db_path).await?;
+    println!("Established connection");
 
     // Note using post for crawls/get because sending
     // urls through query params is a pain in my ass
@@ -37,6 +39,7 @@ pub async fn start(path: &PathBuf, address: &str) -> Result<()> {
 
     let listener = TcpListener::bind(address).await.unwrap();
     axum::serve(listener, app).await.unwrap();
+    println!("done");
     Ok(())
 }
 

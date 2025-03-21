@@ -7,4 +7,6 @@
 http://localhost:3000/add
 ```
 
+# Getting Set up
+sudo apt install musl-tools
 

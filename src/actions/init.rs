@@ -7,9 +7,9 @@ use rusqlite::Connection;
 use crate::db;
 
 pub fn init(path: &PathBuf) -> Result<()> {
-    if path.exists() {
+    if path.join("nvgs.db").exists() {
         return Err(anyhow!(
-            "Invalid path: {} - Can't initialize an already existing directory.",
+            "Invalid path: {} - database exists alread.",
             path.display()
         ));
     }
