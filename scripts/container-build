@@ -1,4 +1,3 @@
 #!/usr/bin/env bash
 # ./scripts/build-musl
-RUSTFLAGS="-C target-feature=-crt-static" cargo build --release
 sudo docker build -t nvgs .

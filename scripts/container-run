@@ -10,6 +10,3 @@ sudo docker run \
     --publish 3000:80 \
     --mount type=bind,src=/var/nvgs/index,dst=/index \
     nvgs
-
-
-

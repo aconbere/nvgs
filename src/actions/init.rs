@@ -7,15 +7,20 @@ use rusqlite::Connection;
 use crate::db;
 
 pub fn init(path: &PathBuf) -> Result<()> {
+    if !path.exists() {
+        fs::create_dir(path)?;
+    }
+
+    if !path.join("warcs").exists() {
+        fs::create_dir(path.join("warcs"))?;
+    }
+
     if path.join("nvgs.db").exists() {
         return Err(anyhow!(
             "Invalid path: {} - database exists alread.",
             path.display()
         ));
     }
-
-    fs::create_dir(path)?;
-    fs::create_dir(path.join("warcs"))?;
 
     let connection = Connection::open(path.join("nvgs.db"))?;
     db::crawls::create_table(&connection)?;

@@ -58,7 +58,9 @@ dependencies = [
 
 [[package]]
 name = "another_rust_warc"
-version = "1.0.0"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "95648887048512862221c10f435885aaec776e7377a1fca71f1c1213b0959efc"
 dependencies = [
  "uuid",
 ]
