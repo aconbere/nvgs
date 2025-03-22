@@ -174,7 +174,7 @@ pub fn get_all_with_status_since(
 }
 
 pub fn get_all_needing_update(connection: &Connection) -> Result<Vec<Crawl>> {
-    get_all_with_status_since(connection, &Status::Ready, &TimeDelta::minutes(60))
+    get_all_with_status_since(connection, &Status::Ready, &TimeDelta::hours(24))
 }
 
 pub fn set_crawling(connection: &Connection, url: &str) -> Result<()> {
