@@ -3,8 +3,10 @@ use std::path::PathBuf;
 use anyhow::Result;
 use axum::{
     Json, Router,
-    extract::State,
-    http::StatusCode,
+    extract::{Request, State},
+    http::{HeaderMap, StatusCode},
+    middleware,
+    middleware::Next,
     response,
     response::{IntoResponse, Response},
     routing,
@@ -17,6 +19,14 @@ use crate::actions::search;
 use crate::actions::search::Document;
 use crate::db::crawls;
 
+mod auth;
+
+#[derive(Clone)]
+struct AppState {
+    connection: Connection,
+    auth_backend: auth::Backend,
+}
+
 static SEARCH_PAGE: &str = include_str!("../../data/search_page.html");
 
 pub async fn start(path: &PathBuf, address: &str) -> Result<()> {
@@ -24,7 +34,12 @@ pub async fn start(path: &PathBuf, address: &str) -> Result<()> {
     let db_path = path.join("nvgs.db");
     println!("Connecting: {}", db_path.display());
     let connection = Connection::open(db_path).await?;
+    let auth_backend = auth::Backend::new(connection.clone());
     println!("Established connection");
+    let state = AppState {
+        connection,
+        auth_backend,
+    };
 
     // Note using post for crawls/get because sending
     // urls through query params is a pain in my ass
@@ -32,9 +47,13 @@ pub async fn start(path: &PathBuf, address: &str) -> Result<()> {
         .route("/crawls", routing::post(add_crawl))
         .route("/crawls/get", routing::post(get_crawl))
         .route("/crawls/delete", routing::post(delete_crawl))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ))
         .route("/search", routing::post(search))
         .route("/search", routing::get(search_page))
-        .with_state(connection)
+        .with_state(state)
         .fallback(handler_404);
 
     let listener = TcpListener::bind(address).await.unwrap();
@@ -48,11 +67,46 @@ struct GetCrawlRequest {
     url: String,
 }
 
+async fn auth_middleware(
+    State(app_state): State<AppState>,
+    headers: HeaderMap,
+    request: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    let Some(username) = headers.get("NVGS-USERNAME") else {
+        return Err(StatusCode::UNAUTHORIZED);
+    };
+
+    let Some(password) = headers.get("NVGS-PASSWORD") else {
+        return Err(StatusCode::UNAUTHORIZED);
+    };
+
+    let Ok(un) = username.to_str() else {
+        return Err(StatusCode::UNAUTHORIZED);
+    };
+
+    let Ok(p) = password.to_str() else {
+        return Err(StatusCode::UNAUTHORIZED);
+    };
+
+    let Ok(maybe_user) = app_state.auth_backend.authenticate(un, p).await else {
+        return Err(StatusCode::UNAUTHORIZED);
+    };
+
+    let Some(_) = maybe_user else {
+        return Err(StatusCode::UNAUTHORIZED);
+    };
+
+    let response = next.run(request).await;
+    Ok(response)
+}
+
 async fn get_crawl(
-    State(connection): State<Connection>,
+    State(app_state): State<AppState>,
     Json(payload): Json<GetCrawlRequest>,
 ) -> Response {
-    let crawl_result = connection
+    let crawl_result = app_state
+        .connection
         .call(move |conn| {
             Ok(crawls::get(&conn, &payload.url)
                 .map_err(|e| tokio_rusqlite::Error::Other(e.into()))?)
@@ -79,10 +133,11 @@ struct AddCrawlRequest {
 }
 
 async fn add_crawl(
-    State(connection): State<Connection>,
+    State(state): State<AppState>,
     Json(payload): Json<AddCrawlRequest>,
 ) -> Result<(StatusCode, String), AppError> {
-    connection
+    state
+        .connection
         .call(|conn| {
             for u in payload.urls {
                 let crawl =
@@ -103,10 +158,11 @@ struct DeleteCrawlRequest {
 }
 
 async fn delete_crawl(
-    State(connection): State<Connection>,
+    State(state): State<AppState>,
     Json(payload): Json<DeleteCrawlRequest>,
 ) -> Result<(StatusCode, String), AppError> {
-    connection
+    state
+        .connection
         .call(move |conn| {
             Ok(crawls::delete(&conn, &payload.url)
                 .map_err(|e| tokio_rusqlite::Error::Other(e.into()))?)
@@ -116,10 +172,11 @@ async fn delete_crawl(
 }
 
 async fn search(
-    State(connection): State<Connection>,
+    State(state): State<AppState>,
     Json(payload): Json<SearchQuery>,
 ) -> Result<(StatusCode, response::Json<SearchResult>), AppError> {
-    let results = connection
+    let results = state
+        .connection
         .call(move |conn| {
             let results = search::execute(conn, &payload.terms)
                 .map_err(|e| tokio_rusqlite::Error::Other(e.into()))?;

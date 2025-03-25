@@ -138,7 +138,9 @@ fn write_request_record(
 
 struct ContentType {
     mime_type: String,
+    #[allow(dead_code)]
     charset: String,
+    #[allow(dead_code)]
     boundary: String,
 }
 

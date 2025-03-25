@@ -25,6 +25,12 @@ pub enum Action {
         #[arg(long)]
         url: String,
     },
+    AddUser {
+        #[arg(long)]
+        username: String,
+        #[arg(long)]
+        password: String,
+    },
     Crawl,
     Index,
     Search {
@@ -47,6 +53,9 @@ pub fn main() -> Result<()> {
 
     match &cli.action {
         Action::Add { url } => actions::add::add(&connection, url),
+        Action::AddUser { username, password } => {
+            actions::add_user::add_user(&connection, username, password)
+        }
         Action::Crawl => actions::crawl::crawl(&mut connection, &cli.path),
         Action::Index => actions::index::index(&connection),
         Action::Search { query } => actions::search::search(&connection, query),
