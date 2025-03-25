@@ -39,11 +39,13 @@ impl User {
 
 pub fn create_table(connection: &Connection) -> Result<()> {
     connection.execute(
-        "CREATE TABLE users (
+        "
+        CREATE TABLE users (
             username STRING NOT NULL,
             password_hash STRING NOT NULL,
             PRIMARY KEY (username)
-        )",
+        )
+        ",
         params![],
     )?;
     Ok(())
@@ -53,7 +55,7 @@ pub fn get(connection: &Connection, username: String) -> Result<User> {
     let mut statement = connection.prepare(
         "
         SELECT
-            username, password_hash, salt, algorithm
+            username, password_hash
         FROM
             users
         WHERE

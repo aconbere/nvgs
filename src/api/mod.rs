@@ -73,11 +73,11 @@ async fn auth_middleware(
     request: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    let Some(username) = headers.get("NVGS-USERNAME") else {
+    let Some(username) = headers.get("Nvgs-Username") else {
         return Err(StatusCode::UNAUTHORIZED);
     };
 
-    let Some(password) = headers.get("NVGS-PASSWORD") else {
+    let Some(password) = headers.get("Nvgs-Password") else {
         return Err(StatusCode::UNAUTHORIZED);
     };
 
