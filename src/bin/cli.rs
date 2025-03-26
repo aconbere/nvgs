@@ -31,7 +31,10 @@ pub enum Action {
         #[arg(long)]
         password: String,
     },
-    Crawl,
+    Crawl {
+        #[arg(long)]
+        index_after: bool,
+    },
     Index,
     Search {
         #[arg(long, value_parser, num_args = 1.., value_delimiter = ' ')]
@@ -56,7 +59,9 @@ pub fn main() -> Result<()> {
         Action::AddUser { username, password } => {
             actions::add_user::add_user(&connection, username, password)
         }
-        Action::Crawl => actions::crawl::crawl(&mut connection, &cli.path),
+        Action::Crawl { index_after } => {
+            actions::crawl::crawl(&mut connection, &cli.path, *index_after)
+        }
         Action::Index => actions::index::index(&connection),
         Action::Search { query } => actions::search::search(&connection, query),
         Action::Init => Err(anyhow!(

@@ -17,6 +17,7 @@ use reqwest::header::{CONTENT_TYPE, USER_AGENT};
 use rusqlite::Connection;
 use scraper::Html;
 
+use crate::actions::index;
 use crate::db::{crawls, term_frequencies};
 
 static USER_AGENT_STR: &str = "nvgs/1.0";
@@ -25,7 +26,7 @@ fn encode_url(url: &str) -> String {
     URL_SAFE.encode(url)
 }
 
-pub fn crawl(connection: &mut Connection, path: &PathBuf) -> Result<()> {
+pub fn crawl(connection: &mut Connection, path: &PathBuf, index_after: bool) -> Result<()> {
     let client = Client::new();
     let entries = crawls::get_all_needing_update(connection)?;
 
@@ -33,6 +34,10 @@ pub fn crawl(connection: &mut Connection, path: &PathBuf) -> Result<()> {
 
     for e in entries {
         crawl_one(connection, path, &client, &e.url)?;
+    }
+
+    if index_after {
+        index::index(connection)?;
     }
     Ok(())
 }
