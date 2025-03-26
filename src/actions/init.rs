@@ -26,6 +26,7 @@ pub fn init(path: &PathBuf) -> Result<()> {
     db::crawls::create_table(&connection)?;
     db::term_frequencies::create_table(&connection)?;
     db::tf_idf::create_table(&connection)?;
+    db::users::create_table(&connection)?;
 
     Ok(())
 }
