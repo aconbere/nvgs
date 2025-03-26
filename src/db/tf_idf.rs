@@ -8,6 +8,16 @@ pub struct TfIdfScore {
     pub score: f64,
 }
 
+impl TfIdfScore {
+    pub fn new(url: &str, term: &str, score: f64) -> Self {
+        Self {
+            url: url.to_string(),
+            term: term.to_string(),
+            score,
+        }
+    }
+}
+
 pub fn create_table(connection: &Connection) -> Result<()> {
     connection.execute(
         "
@@ -19,6 +29,26 @@ pub fn create_table(connection: &Connection) -> Result<()> {
         )
         ",
         params![],
+    )?;
+    Ok(())
+}
+
+pub fn insert(connection: &Connection, item: &TfIdfScore) -> Result<()> {
+    connection.execute(
+        "INSERT INTO
+            tf_idf (
+                url, term, score
+            )
+        VALUES
+            (?1, ?2, ?3)
+        ON CONFLICT
+            (url, term)
+        DO UPDATE
+        SET
+            term = ?2,
+            score = ?3
+        ",
+        params![item.url, item.term, item.score],
     )?;
     Ok(())
 }

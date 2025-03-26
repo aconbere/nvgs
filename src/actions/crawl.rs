@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
@@ -279,13 +279,20 @@ pub fn analyze_terms(
 ) -> Result<Vec<term_frequencies::TermFrequency>> {
     let lines = BufReader::new(reader).lines();
 
-    let mut terms: HashMap<String, term_frequencies::TermFrequency> = HashMap::new();
+    let mut terms: BTreeMap<String, term_frequencies::TermFrequency> = BTreeMap::new();
     let mut total = 0;
 
     for line in lines {
         let l = line?;
         for word in l.split_whitespace() {
-            let w = word.to_lowercase();
+            // Lowecase and strip punctuation
+            let w = word.to_lowercase().replace(
+                &[
+                    '(', ')', ',', '\"', '.', ';', ':', '\'', '-', '~', '+', '=', '$', '%', '^',
+                    '*', '?',
+                ][..],
+                "",
+            );
             total += 1;
             if let Some(tf) = terms.get_mut(&w) {
                 tf.count += 1;
@@ -313,9 +320,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn content_type() {
+    fn test_content_type_parsing() {
         let test = "text/html; charset=UTF-8".to_string();
         let result = ContentType::from_string(&test);
         assert_eq!(result.mime_type, "text/html");
+    }
+
+    #[test]
+    fn test_analyze_terms() {
+        let mut input = "Alpha Bravo.\n Charlie \n Delta\tEcho\nAlpha Delta\nAlpha".as_bytes();
+        let url = "http://www.example.com";
+        let result = analyze_terms(&mut input, url).unwrap();
+        assert_eq!(
+            vec![
+                term_frequencies::TermFrequency::new(url, "alpha", 3, 0.375),
+                term_frequencies::TermFrequency::new(url, "bravo", 1, 0.125),
+                term_frequencies::TermFrequency::new(url, "charlie", 1, 0.125),
+                term_frequencies::TermFrequency::new(url, "delta", 2, 0.25),
+                term_frequencies::TermFrequency::new(url, "echo", 1, 0.125),
+            ],
+            result
+        )
     }
 }

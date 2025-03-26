@@ -1,11 +1,23 @@
 use anyhow::Result;
 use rusqlite::{Connection, params};
 
+#[derive(Debug, PartialEq)]
 pub struct TermFrequency {
     pub url: String,
     pub term: String,
     pub count: u64,
     pub frequency: f64,
+}
+
+impl TermFrequency {
+    pub fn new(url: &str, term: &str, count: u64, frequency: f64) -> Self {
+        Self {
+            url: url.to_string(),
+            term: term.to_string(),
+            count,
+            frequency,
+        }
+    }
 }
 
 pub fn create_table(connection: &Connection) -> Result<()> {
