@@ -14,6 +14,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
 use tokio_rusqlite::Connection;
+use tower_http::cors::CorsLayer;
 
 use crate::actions::search;
 use crate::actions::search::Document;
@@ -53,6 +54,7 @@ pub async fn start(path: &PathBuf, address: &str) -> Result<()> {
         ))
         .route("/search", routing::post(search))
         .route("/search", routing::get(search_page))
+        .layer(CorsLayer::very_permissive())
         .with_state(state)
         .fallback(handler_404);
 

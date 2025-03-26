@@ -19,6 +19,7 @@ serde = { version = "1.0.218", features = ["derive"] }
 tokio = { version = "1.43.0", features = ["full"] }
 tokio-rusqlite = { version = "0.6.0" } #, features = ["bundled-sqlcipher"] }
 tower = "0.5.2"
+tower-http = { version = "0.6.2", features = ["cors"] }
 openssl = { version = "0.10", features = ["vendored"] }
 async-trait = "0.1.88"
 axum-login = "0.17.0"

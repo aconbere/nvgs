@@ -10,8 +10,8 @@
 ```bash
 curl -i \
 -H "Content-Type: application/json" \
--H "Nvgs-Username: test" \
--H "Nvgs-Password: pass" \
+-H "Nvgs-Username: username" \
+-H "Nvgs-Password: password" \
 -X POST -d "{\"urls\": [\"http://anders.conbere.org\"]}" \
 http://localhost:3000/crawls
 ```
