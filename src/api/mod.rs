@@ -29,6 +29,7 @@ struct AppState {
 }
 
 static SEARCH_PAGE: &str = include_str!("../../data/search_page.html");
+static INTRO_PAGE: &str = include_str!("../../data/intro_page.html");
 
 pub async fn start(path: &PathBuf, address: &str) -> Result<()> {
     println!("Starting nvgs server: {}", address);
@@ -54,6 +55,7 @@ pub async fn start(path: &PathBuf, address: &str) -> Result<()> {
         ))
         .route("/search", routing::post(search))
         .route("/search", routing::get(search_page))
+        .route("/", routing::get(intro_page))
         .layer(CorsLayer::very_permissive())
         .with_state(state)
         .fallback(handler_404);
@@ -194,6 +196,10 @@ async fn search(
 
 async fn search_page() -> response::Html<&'static str> {
     response::Html(SEARCH_PAGE)
+}
+
+async fn intro_page() -> response::Html<&'static str> {
+    response::Html(INTRO_PAGE)
 }
 
 #[derive(Deserialize)]

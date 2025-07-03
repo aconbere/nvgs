@@ -55,7 +55,7 @@ pub fn main() -> Result<()> {
     let mut connection = Connection::open(db_path)?;
 
     match &cli.action {
-        Action::Add { url } => actions::add::add(&connection, url),
+        Action::Add { url } => actions::add_url::add_url(&connection, url),
         Action::AddUser { username, password } => {
             actions::add_user::add_user(&connection, username, password)
         }

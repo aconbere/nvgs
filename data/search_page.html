@@ -13,7 +13,6 @@
         </ol>
     </body>
     <script type="text/javascript">
-        console.log("start");
         let createResultElement = (result) => {
             let li = document.createElement("li");
             let link = document.createElement("a");
@@ -34,7 +33,6 @@
             e.preventDefault();
             e.stopPropagation();
 
-            console.log("click");
             resultsList.innerHTML = "";
             if(searchInput == ""){
                 return;
@@ -47,7 +45,6 @@
                     "Content-Type": "application/json",
                 },
             });
-            console.log("searched");
 
             let results = await response.json();
 

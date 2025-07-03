@@ -1,3 +1,17 @@
+## Getting Started
+
+Initialize the index
+
+```bash
+./target/release/cli -path ~/path/to/index init
+```
+
+Start the webserver
+
+```bash
+./target/release/api --path ~/path/to/index --address 127.0.0.1:3456
+```
+
 ## Test Queries
 ```bash
 ./target/release/cli -path ~/path/to/index init
@@ -16,5 +30,8 @@ curl -i \
 http://localhost:3000/crawls
 ```
 
-## TODO
-- Update crawls table to add who added the crawl
+## Deploying
+
+Deploy tooling and descriptions are currently found in https://github.com/aconbere/nvgs-service (note this is currently a private repository, reach out to me if you need access).
+
+
