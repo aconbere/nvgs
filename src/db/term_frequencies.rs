@@ -1,6 +1,9 @@
 use anyhow::Result;
 use rusqlite::{Connection, params};
 
+/* Caches a count of terms found in document
+ * retrieved from the given url
+ */
 #[derive(Debug, PartialEq)]
 pub struct TermFrequency {
     pub url: String,

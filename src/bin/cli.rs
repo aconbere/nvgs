@@ -31,6 +31,10 @@ pub enum Action {
         #[arg(long)]
         password: String,
     },
+    AddSource {
+        #[arg(long)]
+        url: String,
+    },
     Crawl {
         #[arg(long)]
         index_after: bool,
@@ -59,6 +63,8 @@ pub fn main() -> Result<()> {
         Action::AddUser { username, password } => {
             actions::add_user::add_user(&connection, username, password)
         }
+        Action::AddSource { url } => actions::add_source::add_source(&connection, url),
+        Action::FetchSources => actions::add_source::add_source(&connection, url),
         Action::Crawl { index_after } => {
             actions::crawl::crawl(&mut connection, &cli.path, *index_after)
         }

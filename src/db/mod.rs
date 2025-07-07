@@ -2,6 +2,7 @@ use anyhow::Result;
 use rusqlite::Connection;
 
 pub mod crawls;
+pub mod sources;
 pub mod term_frequencies;
 pub mod tf_idf;
 pub mod users;

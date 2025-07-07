@@ -69,6 +69,7 @@ pub async fn start(path: &PathBuf, address: &str) -> Result<()> {
 #[derive(Deserialize)]
 struct GetCrawlRequest {
     url: String,
+    source: String,
 }
 
 async fn auth_middleware(
@@ -145,7 +146,7 @@ async fn add_crawl(
         .call(|conn| {
             for u in payload.urls {
                 let crawl =
-                    crawls::Crawl::new(&u).map_err(|e| tokio_rusqlite::Error::Other(e.into()))?;
+                    crawls::ToCrawl::new(&u).map_err(|e| tokio_rusqlite::Error::Other(e.into()))?;
                 crawls::insert(&conn, &crawl)
                     .map_err(|e| tokio_rusqlite::Error::Other(e.into()))?;
                 println!("Added url: {}", u);

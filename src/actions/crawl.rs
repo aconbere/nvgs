@@ -19,13 +19,18 @@ use scraper::Html;
 
 use crate::actions::index;
 use crate::db::{crawls, term_frequencies};
-
-static USER_AGENT_STR: &str = "nvgs/1.0";
+use crate::user_agent;
 
 fn encode_url(url: &str) -> String {
     URL_SAFE.encode(url)
 }
 
+/* Sets about fetching and processing each of the urls in the list of "crawls"
+ *
+ * TODO: Add sources here
+ * - Be able to fetch and store other folks indexed lists of url
+ * - then retrieve them at this state to crawl.
+ */
 pub fn crawl(connection: &mut Connection, path: &PathBuf, index_after: bool) -> Result<()> {
     let client = Client::new();
     let entries = crawls::get_all_needing_update(connection)?;
@@ -51,7 +56,10 @@ pub fn crawl_one(
     crawls::set_crawling(connection, url)?;
 
     let result: Result<()> = try {
-        let request = client.get(url).header(USER_AGENT, USER_AGENT_STR).build()?;
+        let request = client
+            .get(url)
+            .header(USER_AGENT, user_agent::USER_AGENT)
+            .build()?;
 
         println!("Fetching {}", url);
         let mut response =

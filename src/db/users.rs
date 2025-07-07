@@ -5,6 +5,8 @@ use argon2::{
 };
 use rusqlite::{Connection, params};
 
+/* Represents a user that can authenticate to the api
+ */
 #[derive(Debug, Clone)]
 pub struct User {
     pub username: String,

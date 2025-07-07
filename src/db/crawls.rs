@@ -48,20 +48,24 @@ impl ToSql for Status {
     }
 }
 
+/* Represents the intent to crawl a url
+ */
 #[derive(Serialize)]
-pub struct Crawl {
+pub struct ToCrawl {
     pub url: String,
     pub status: Status,
     pub last_updated: i64,
+    pub source: String,
 }
 
-impl Crawl {
-    pub fn new(url_str: &str) -> Result<Self> {
+impl ToCrawl {
+    pub fn new(url_str: &str, source: &str) -> Result<Self> {
         let url = Url::parse(url_str)?;
         Ok(Self {
             url: url.into(),
             status: Status::Ready,
             last_updated: -1,
+            source: source.into(),
         })
     }
 }
@@ -72,52 +76,54 @@ pub fn create_table(connection: &Connection) -> Result<()> {
             url STRING NOT NULL,
             status STRING NOT NULL,
             last_updated INTEGER NOT NULL,
-            PRIMARY KEY (url)
+            source STRING NOT NULL,
+            PRIMARY KEY (url, source)
         )",
         params![],
     )?;
     Ok(())
 }
 
-pub fn insert(connection: &Connection, crawl: &Crawl) -> Result<()> {
+pub fn insert(connection: &Connection, crawl: &ToCrawl) -> Result<()> {
     connection.execute(
         "INSERT INTO
             crawls (
-                url, status, last_updated
+                url, status, last_updated, source
             )
         VALUES
-            (?1, ?2, ?3)
+            (?1, ?2, ?3, ?4)
         ON CONFLICT
-            (url)
+            (url, source)
         DO UPDATE
         SET
             status = ?2,
             last_updated = ?3
         ",
-        params![crawl.url, crawl.status, crawl.last_updated],
+        params![crawl.url, crawl.status, crawl.last_updated, crawl.source],
     )?;
     Ok(())
 }
 
-pub fn get(connection: &Connection, url: &str) -> Result<Option<Crawl>> {
+pub fn get(connection: &Connection, url: &str, source: &str) -> Result<Option<ToCrawl>> {
     let mut statement = connection.prepare(
         "SELECT
-            url, status, last_updated
+            url, status, last_updated, source
         FROM
             crawls
         WHERE
-            url = ?1
+            url = ?1  AND source = ?2
         LIMIT
             1
         ",
     )?;
 
-    let result: Option<Crawl> = statement
-        .query_row(params![url], |row| {
-            Ok(Crawl {
+    let result: Option<ToCrawl> = statement
+        .query_row(params![url, source], |row| {
+            Ok(ToCrawl {
                 url: row.get(0)?,
                 status: row.get(1)?,
                 last_updated: row.get(2)?,
+                source: row.get(3)?,
             })
         })
         .optional()?;
@@ -144,7 +150,7 @@ pub fn get_all_with_status_since(
     connection: &Connection,
     status: &Status,
     since: &TimeDelta,
-) -> Result<Vec<Crawl>> {
+) -> Result<Vec<ToCrawl>> {
     let mut statement = connection.prepare(
         "SELECT
             url, status, last_updated
@@ -158,12 +164,13 @@ pub fn get_all_with_status_since(
 
     let last_updated = (Utc::now() - *since).timestamp();
 
-    let result: Vec<Crawl> = statement
+    let result: Vec<ToCrawl> = statement
         .query_map(params![status, last_updated], |row| {
-            Ok(Crawl {
+            Ok(ToCrawl {
                 url: row.get(0)?,
                 status: row.get(1)?,
                 last_updated: row.get(2)?,
+                source: row.get(3)?,
             })
         })?
         .into_iter()
@@ -173,7 +180,7 @@ pub fn get_all_with_status_since(
     Ok(result)
 }
 
-pub fn get_all_needing_update(connection: &Connection) -> Result<Vec<Crawl>> {
+pub fn get_all_needing_update(connection: &Connection) -> Result<Vec<ToCrawl>> {
     get_all_with_status_since(connection, &Status::Ready, &TimeDelta::hours(24))
 }
 
